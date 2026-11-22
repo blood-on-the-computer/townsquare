@@ -73,6 +73,19 @@ function ok(name, condition) {
   await frame(host, "allowHost");
   const p1 = await connect(`${base}/p1`);
   const other = await connect(`${base}/other`);
+  // 回归：玩家上线后，说书人必须通过 quickWakePresence 收到包含该玩家的在线集合，
+  // 否则前端 onlinePlayerIds 恒为空 → 发送对象始终显示离线。
+  const presence = await frame(
+    host,
+    "quickWakePresence",
+    (p) => Array.isArray(p.playerIds) && p.playerIds.includes("p1"),
+  );
+  ok(
+    "玩家上线后说书人即时收到 presence（含在线玩家）",
+    presence.hostOnline === true &&
+      presence.playerIds.includes("p1") &&
+      presence.playerIds.includes("other"),
+  );
   send(other, "quickWakeSeats", ["other"]);
   await frame(other, "quickWakeError");
   send(host, "quickWakeSeats", []);

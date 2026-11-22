@@ -247,9 +247,15 @@ function sendQuickWakeSnapshot(ws, room) {
 }
 
 function notifyQuickWakePresence(room) {
+  // 仅把「连接仍然存活」的玩家算作在线，避免半开/已断未清理的连接残留在
+  // players 里导致对面看到幽灵在线；同时确保 presence 反映真实的当前在线集合。
+  // 注意：must filter by ws.readyState === 1 (OPEN)，否则 reconnecting 的玩家会短暂
+  // 出现在列表里，使 host 误发到已断开的连接。
   const presence = {
-    hostOnline: !!(room.host && room.host.ws.readyState === 1),
-    playerIds: Array.from(room.players.keys()),
+    hostOnline: !!(room.host && room.host.ws && room.host.ws.readyState === 1),
+    playerIds: Array.from(room.players.entries())
+      .filter(([, p]) => p && p.ws && p.ws.readyState === 1)
+      .map(([id]) => id),
   };
   if (room.host) send(room.host.ws, "quickWakePresence", presence);
   room.players.forEach(player => send(player.ws, "quickWakePresence", presence));
@@ -896,6 +902,10 @@ function handleRoomConnection(ws, pathname, req) {
     }
     room.players.set(playerId, { ws, ping: 0, connectedAt: Date.now() });
     log("player connect channel", channel, "playerId", playerId, "players:", room.players.size);
+    // 玩家上线后立即广播 presence，让说书人端的「快捷短语对象在线状态」实时更新。
+    // （此前只在 host 连接 / 玩家 bye / socket 断开时才通知，导致玩家上线时
+    //   host 的 onlinePlayerIds 仍是旧的空集合 → 发送对象始终显示离线。）
+    notifyQuickWakePresence(room);
     // 客户端会 _request checkAllowJoin；此处按房间是否存在(曾有过host)回答
     send(ws, "allowJoin", true);
     // 关键修复：若说书人此前已广播过 gs（含座位表），立即补发给刚加入的玩家，
@@ -928,6 +938,8 @@ function routeRoomMessage(ws, command, params, feedback) {
         return;
       }
       if (Array.isArray(params)) room.quickWakeSeated = new Set(params.filter(id => typeof id === "string" && id && id !== "host" && id !== meta.playerId));
+      // 座位名单更新后同步刷新 presence，保证在线集合与座位表一致性。
+      notifyQuickWakePresence(room);
       return;
     }
     case "quickWakeSend": {
