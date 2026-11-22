@@ -1248,6 +1248,11 @@ $border: rgba(0, 0, 0, 0.9);
     font-size: 12px;
     color: rgba(255, 255, 255, 0.7);
     select {
+      // 与 .sl-quick-status 等其它表单控件统一宽度，避免默认按内容/最长 option 撑开
+      width: 120px;
+      min-width: 120px;
+      max-width: 120px;
+      flex: none;
       background: rgba(0, 0, 0, 0.4);
       color: #eee;
       border: 2px solid $border;
