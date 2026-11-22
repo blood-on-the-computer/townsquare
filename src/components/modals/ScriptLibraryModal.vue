@@ -828,6 +828,9 @@ export default {
     onSearchInput() {
       this.page = 1;
       if (this.sourceLib === "yupi") {
+        // 立即作废「当前在途的旧请求」：递增令牌，使其晚到的响应被丢弃，
+        // 避免它把列表覆盖成上一次关键词的结果（清空搜索后仍卡旧内容的另一条路径）。
+        this._yupiReqToken = (this._yupiReqToken || 0) + 1;
         clearTimeout(this._yupiTimer);
         this._yupiTimer = setTimeout(() => this.loadYupi(true), 350);
       }
@@ -901,7 +904,15 @@ export default {
     onSourceChange() {
       this.error = "";
       this.page = 1;
-      if (this.sourceLib === "yupi" && !this.yupiItems.length) {
+      // 取消可能还在等待中的搜索防抖，避免切源后又被上一次输入触发的旧请求覆盖。
+      clearTimeout(this._yupiTimer);
+      // yupi 列表是服务端分页 + 服务端按 keyword 过滤的结果缓存。之前一旦搜过关键词，
+      // yupiItems 里只剩「命中的子集」；切回 yupi 时若因其非空而跳过重新加载，
+      // 界面就会一直卡在旧的搜索内容上（本例 bug）。
+      // 因此切到 yupi 时一律清空旧缓存并按「当前 keyword」重新拉取：
+      // 若搜索框已被清空，这里就是按空关键词拉全量，恢复正常列表。
+      if (this.sourceLib === "yupi") {
+        this.yupiItems = [];
         this.loadYupi(true);
       }
     },
@@ -958,7 +969,12 @@ export default {
       };
     },
     async loadYupi(reset) {
-      if (this.yupiLoading) return;
+      // 只有「加载更多」(reset=false) 才需要防重入；reset=true 表示用户改动了搜索词/切了来源，
+      // 必须以最新条件重新拉取，不能被一个尚未返回的旧请求挡住（否则清空搜索后仍显示旧结果）。
+      if (!reset && this.yupiLoading) return;
+      // 每次 reset 用递增令牌标记，返回时若令牌已过期（期间又发起了新请求）则丢弃结果，
+      // 避免旧请求晚到后把新结果覆盖回「旧的搜索子集」。
+      const token = reset ? (this._yupiReqToken = (this._yupiReqToken || 0) + 1) : this._yupiReqToken;
       this.yupiLoading = true;
       this.error = "";
       const offset = reset ? 0 : this.yupiItems.length;
@@ -967,14 +983,18 @@ export default {
         offset: String(offset),
         sort: "new"
       });
+      // 用当前 keyword 作为请求条件（清空后即为空 → 拉全量）。
       const kw = this.keyword.trim();
       if (kw) params.set("keyword", kw);
       try {
         const data = await this.yupiFetch("/api/scripts?" + params.toString());
+        // 过期响应直接丢弃，不写回 state（新请求正在路上，由它负责置回 loading）。
+        if (reset && token !== this._yupiReqToken) return;
         const list = Array.isArray(data.items) ? data.items.map(x => this.mapYupiItem(x)) : [];
         this.yupiItems = reset ? list : this.yupiItems.concat(list);
         if (typeof data.total === "number") this.yupiTotal = data.total;
       } catch (e) {
+        if (reset && token !== this._yupiReqToken) return;
         this.error = "鱼皮剧本库加载失败：" + (e && e.message ? e.message : e);
       }
       this.yupiLoading = false;
