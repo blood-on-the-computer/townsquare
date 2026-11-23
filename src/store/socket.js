@@ -444,6 +444,9 @@ class LiveSession {
         this._deleteFromQueue(params);
         break;
       case "quickWakePresence":
+        // 房间级在线状态：写一次到公用 session.presence（座位 UI 直接读），
+        // 同时保留 quickWake 侧的一份供快捷唤醒面板沿用，避免改动其现有逻辑。
+        this._store.commit("session/setPresence", params);
         this._store.commit("quickWake/setPresence", params);
         break;
       case "quickWakeAccepted":

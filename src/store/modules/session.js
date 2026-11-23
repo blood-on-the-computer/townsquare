@@ -70,6 +70,14 @@ const state = () => ({
   isReview: false,
   // 复盘视角：被说书人点开揭示的座位下标数组；-1 表示无。所有端同步。
   reviewRevealed: [],
+  // 房间级在线状态（服务器主动推送，所有人共享）：
+  //   hostOnline: 说书人连接是否存活
+  //   playerIds:  当前真正连着的玩家 playerId 列表（服务端已按 ws.readyState===1 过滤）
+  // 座位 UI 直接读这份数据判断「在线/离线」，不复制到其它模块。
+  presence: {
+    hostOnline: false,
+    playerIds: []
+  },
   isChatOpen: false,
   isTyping: false,
   messageQueue: [],
@@ -145,6 +153,15 @@ const mutations = {
   setIsReview: set("isReview"),
   setReviewRevealed(state, val) {
     state.reviewRevealed = Array.isArray(val) ? [...val] : [];
+  },
+  setPresence(state, presence) {
+    state.presence = {
+      hostOnline: !!(presence && presence.hostOnline),
+      playerIds:
+        presence && Array.isArray(presence.playerIds)
+          ? presence.playerIds.slice()
+          : []
+    };
   },
   setInputResolver(state, resolver) {
     state.inputResolver = resolver;

@@ -19,6 +19,12 @@
       <div class="seatNum">{{ players.indexOf(player) + 1 }}</div>
       <div class="newMessage" v-show="player.newMessages > 0">{{ player.newMessages }}</div>
 
+      <!-- 离线提示：玩家离线时显示灰色半透明遮罩 + 居中「离线」标签。
+           纯展示，不绑任何点击（pointer-events:none），不影响点头像等操作。 -->
+      <div v-if="isOffline" class="offline-mask" aria-hidden="true">
+        <span class="offline-label">离线</span>
+      </div>
+
       <!-- 隐藏模式 / 复盘视角下的整座点击层：确保点座位任意位置都立即响应 -->
       <div v-if="grimoire.isPublic || session.isReview" class="public-click-catcher" @click.stop="toggleStatus()"></div>
 
@@ -378,6 +384,15 @@ export default {
       const reminders = !this.session.isSpectator ? this.player.reminders : 
         (this.session.isReview ? this.player.stReminders : this.player.reminders);
       return reminders;
+    },
+    // 本座位玩家是否离线：有 player.id、且不是说书人座椅('host')，
+    // 且该 id 不在服务器推送的在线集合里 → 判定离线（无宽限期，连不上即离线）。
+    isOffline: function() {
+      const id = this.player && this.player.id;
+      if (!id || id === "host") return false;
+      const presence = this.session.presence;
+      const ids = presence && Array.isArray(presence.playerIds) ? presence.playerIds : [];
+      return !ids.includes(id);
     }
   },
   data() {
@@ -817,6 +832,39 @@ export default {
 
   #townsquare:not(.spectator) &.dead .shroud:hover:before {
     opacity: 1;
+  }
+}
+
+/***** Offline overlay *****/
+.player {
+  .offline-mask {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    // 用 padding-top 撑成与座位圆盘等大的正方形，只覆盖角色图标那一个圆，
+    // 不用 height:100%（.player 容器比圆盘高，会被拉成椭圆并盖到名字）。
+    padding-top: 100%;
+    border-radius: 50%;
+    background: rgba(20, 20, 20, 0.55);
+    z-index: 2;
+    // 纯展示：不拦截任何点击/悬停，说书人仍可点头像进行操作
+    pointer-events: none;
+
+    // 用 absolute 居中，避免 padding-top 把 flex 内容顶到下方
+    .offline-label {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      color: #fff;
+      font-weight: bold;
+      font-size: 0.9em;
+      letter-spacing: 2px;
+      text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+      user-select: none;
+      white-space: nowrap;
+    }
   }
 }
 
@@ -1379,6 +1427,8 @@ li.move:not(.from) .player .overlay svg.move {
   top: 5px;
   box-shadow: 0 0 5px black;
   padding: 0 4px;
+  // 名字浮在离线遮罩之上，避免离线时名字被压暗
+  z-index: 4;
 
   svg {
     top: 3px;
