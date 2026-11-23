@@ -615,12 +615,18 @@ if (fs.existsSync(DIST_DIR)) {
     res.set("Expires", "0");
     res.sendFile(path.join(DIST_DIR, "index.html"), (err) => err && next(err));
   });
-  // 其余静态资源：带 hash 的 js/css 长缓存；index.html 由上面的路由处理
+  // 其余静态资源：图片/字体/带 hash 的 js、css 长缓存；index.html 由上面的路由处理。
+  // 背景：此前这里没有给静态素材设 Cache-Control，浏览器只能靠启发式缓存，过期极快，
+  // 界面不再渲染后十几秒素材即失效，再次显示时又回服务端重复拉取同一张图。
+  // 这些素材随构建产物发布、内容不变（规则/剧本图片、角色图标等），理应长期缓存。
+  const STATIC_IMMUTABLE_MAX_AGE = "public, max-age=31536000, immutable";
   app.use(
     express.static(DIST_DIR, {
       setHeaders: (res, filePath) => {
         if (filePath.endsWith("index.html")) {
           res.set("Cache-Control", "no-cache, no-store, must-revalidate");
+        } else {
+          res.set("Cache-Control", STATIC_IMMUTABLE_MAX_AGE);
         }
       },
     })
