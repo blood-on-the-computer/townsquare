@@ -846,7 +846,12 @@ export default {
     // 不用 height:100%（.player 容器比圆盘高，会被拉成椭圆并盖到名字）。
     padding-top: 100%;
     border-radius: 50%;
-    background: rgba(20, 20, 20, 0.55);
+    box-sizing: border-box;
+    // 淡黑半透明罩：压暗座位表明「离线」，但足够通透，不会盖死半透明帷幕花纹。
+    // 遮罩外观只由「是否离线」决定，与「是否死亡/帷幕」完全无关（勿再加 .dead 覆盖）。
+    background: rgba(20, 20, 20, 0.32);
+    // 实色描边圈：不会被半透明帷幕吃掉，强化离线边界感。
+    box-shadow: inset 0 0 0 3px rgba(90, 90, 90, 0.9);
     z-index: 2;
     // 纯展示：不拦截任何点击/悬停，说书人仍可点头像进行操作
     pointer-events: none;
@@ -859,9 +864,14 @@ export default {
       transform: translate(-50%, -50%);
       color: #fff;
       font-weight: bold;
-      font-size: 0.9em;
-      letter-spacing: 2px;
-      text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+      font-size: 0.8em;
+      letter-spacing: 1px;
+      // 彩色底框，亮/暗背景（含帷幕）上都清晰醒目
+      padding: 1px 8px;
+      border-radius: 10px;
+      background: rgba(200, 50, 50, 0.9);
+      box-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
       user-select: none;
       white-space: nowrap;
     }
