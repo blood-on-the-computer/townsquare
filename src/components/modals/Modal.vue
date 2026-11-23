@@ -62,10 +62,10 @@ export default {
       this.$emit("close");
     },
     closeCheck() {
-      if (!this.dismissible) return;
-      // 输入时点击背景不关闭
-      if (this.name === "input" && this.type === "input") return;
-      this.close();
+      // 统一策略：点击遮罩（窗口外部区域）一律不关闭任何弹窗，
+      // 只能通过右上角关闭按钮（dismissible=true 时显示）或窗口内的确认/取消按钮关闭。
+      // dismissible 仍然只控制「右上角 × 关闭按钮是否显示」，不再影响点遮罩的行为。
+      return;
     }
   }
 };
